@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tienthang
+      POSTGRES_USER: tienthang
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tienthang"]
+      interval: 10s
+      retries: 5
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://tienthang:${DB_PASSWORD}@db:5432/tienthang
+      ADMIN_API_KEY: ${ADMIN_API_KEY:?Set ADMIN_API_KEY in .env}
+    ports:
+      - "127.0.0.1:8088:8080"
+volumes:
+  postgres_data:
+  sync:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["python", "-m", "app.sync_worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://tienthang:${DB_PASSWORD}@db:5432/tienthang
+      ATTENDANCE_DIR: /attendance
+    volumes:
+      - ${ATTENDANCE_HOST_PATH:?Set ATTENDANCE_HOST_PATH in .env}:/attendance:ro
